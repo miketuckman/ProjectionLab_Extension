@@ -391,7 +391,9 @@
       chrome.storage.sync.get(
         ['autoSyncEnabled', 'autoSyncFrequency', 'autoSyncDayOfWeek', 'autoSyncDayOfMonth', 'autoSyncTimeHour', 'autoSyncTimeMinute'],
         (sync) => {
-          autoSyncCheckbox.checked = !!sync.autoSyncEnabled;
+          autoSyncCheckbox.checked = false;
+          autoSyncCheckbox.disabled = true;
+          autoSyncCheckbox.title = 'Automatic writes are disabled in the MCP-backed fork.';
           autoSyncFrequency.value = sync.autoSyncFrequency || 'daily';
           if (autoSyncDayWeek) autoSyncDayWeek.value = String(Math.max(0, Math.min(6, sync.autoSyncDayOfWeek ?? 1)));
           if (autoSyncDayMonth) autoSyncDayMonth.value = String(Math.max(1, Math.min(28, sync.autoSyncDayOfMonth ?? 1)));
@@ -399,6 +401,7 @@
           const m = Math.max(0, Math.min(59, sync.autoSyncTimeMinute ?? 0));
           autoSyncTime.value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
           updateAutoSyncVisibility();
+          chrome.storage.sync.set({ autoSyncEnabled: false, autoSyncFrequency: '' });
         }
       );
       autoSyncCheckbox.addEventListener('change', () => { saveAutoSync(); updateAutoSyncVisibility(); });
@@ -431,7 +434,17 @@
     document.getElementById('clear-cache').addEventListener('click', async () => {
       if (card.classList.contains('advanced-locked')) return;
       if (!confirm('Clear all cached data? You will need to load Monarch and ProjectionLab accounts again. Your API key and saved mappings will be kept.')) return;
-      await chrome.storage.local.clear();
+      await chrome.storage.local.remove([
+        'cachedMonarchAccounts',
+        'cachedPLAccounts',
+        'lastMonarchRefreshTime',
+        'lastPLRefreshTime',
+        'lastSyncTime',
+        'lastSyncResults',
+        'lastSyncDebug',
+        'syncHistory',
+        'mcpBalancePreviews',
+      ]);
       monarchAccounts = [];
       plAccounts = [];
       updateChips();
@@ -460,9 +473,10 @@
       monarchAccounts = [];
       plAccounts = [];
       accountMappings = [];
-      await chrome.storage.sync.set({ plApiKey: '', autoSyncEnabled: false });
-      if (!(await saveMappingsToStorage(accountMappings))) return;
       await chrome.storage.local.clear();
+      await chrome.storage.sync.set({ autoSyncEnabled: false, autoSyncFrequency: '' });
+      await chrome.storage.sync.remove('plApiKey');
+      if (!(await saveMappingsToStorage(accountMappings))) return;
       updateChips();
       updateStepComplete('step1', false);
       updateStepComplete('step2', false);
@@ -612,9 +626,14 @@
   function reconcileMappingsWithAccounts() {}
 
   async function loadStorage() {
-    const [sync, local] = await Promise.all([
-      chrome.storage.sync.get(['plApiKey']),
-      chrome.storage.local.get(['cachedMonarchAccounts', 'cachedPLAccounts', 'lastMonarchRefreshTime', 'lastPLRefreshTime']),
+    const [local, storedApiKey] = await Promise.all([
+      chrome.storage.local.get([
+        'cachedMonarchAccounts',
+        'cachedPLAccounts',
+        'lastMonarchRefreshTime',
+        'lastPLRefreshTime',
+      ]),
+      globalThis.ProjectionLabSecretStorage.loadApiKey(),
     ]);
     let rawMappings = [];
     try {
@@ -624,12 +643,8 @@
       mappingStorageLoadError = e;
       console.error('[Chrysalis][setup] Failed to load account mappings:', e);
     }
-    plApiKey = sync.plApiKey || '';
+    plApiKey = storedApiKey || '';
     accountMappings = normalizeMappings(rawMappings || []);
-    try {
-      console.log('[Chrysalis][setup] loadStorage raw accountMappings from sync:', rawMappings);
-      console.log('[Chrysalis][setup] loadStorage normalized accountMappings:', accountMappings);
-    } catch (_) {}
     if (Array.isArray(local.cachedMonarchAccounts) && local.cachedMonarchAccounts.length > 0) {
       monarchAccounts = local.cachedMonarchAccounts;
     }
@@ -674,7 +689,7 @@
     const key = document.getElementById('pl-key').value.trim();
     if (!key) return;
     plApiKey = key;
-    await chrome.storage.sync.set({ plApiKey: key });
+    await globalThis.ProjectionLabSecretStorage.saveApiKey(key);
     // A saved key may belong to a different instance than the previously cached
     // one — drop the cache so the next "Load Accounts" re-runs detection.
     await clearCachedPLOrigin();
@@ -687,7 +702,7 @@
   document.getElementById('clear-key').onclick = async () => {
     document.getElementById('pl-key').value = '';
     plApiKey = '';
-    await chrome.storage.sync.remove('plApiKey');
+    await globalThis.ProjectionLabSecretStorage.clearApiKey();
     await clearCachedPLOrigin();
     updateChips();
     updateStepComplete('step1', false);
@@ -878,7 +893,9 @@
   }
 
   async function fetchPLAccounts() {
-    const key = plApiKey && plApiKey.trim() ? plApiKey : (await chrome.storage.sync.get(['plApiKey'])).plApiKey;
+    const key = plApiKey && plApiKey.trim()
+      ? plApiKey
+      : await globalThis.ProjectionLabSecretStorage.loadApiKey();
     if (!key) throw new Error('Save your ProjectionLab API key first.');
 
     // Detect which instance this key belongs to (or use cached origin).
@@ -1144,7 +1161,9 @@
     wrap.style.display = 'block';
     out.textContent = 'Fetching export schema…';
     try {
-      const key = plApiKey && plApiKey.trim() ? plApiKey : (await chrome.storage.sync.get(['plApiKey'])).plApiKey;
+      const key = plApiKey && plApiKey.trim()
+        ? plApiKey
+        : await globalThis.ProjectionLabSecretStorage.loadApiKey();
       if (!key) {
         out.textContent = 'Save your ProjectionLab API key first (Step 1).';
         return;
@@ -1971,7 +1990,7 @@
       } catch (e) {
         // If a row cannot be rendered for any reason, drop it from the in-memory list
         // so it doesn't "reserve" Monarch/PL accounts invisibly.
-        console.error('[Chrysalis] Failed to render mapping row, dropping entry:', e, m);
+        console.error('[Chrysalis] Failed to render a mapping row:', e.message || String(e));
       }
     });
     if (safe.length !== accountMappings.length) {
@@ -2015,9 +2034,6 @@
       return false;
     }
     if (!(await saveMappingsToStorage([...accountMappings]))) return false;
-    try {
-      console.log('[Chrysalis][setup] persistMappings saving accountMappings:', accountMappings);
-    } catch (_) {}
     updateChips();
     const step3Complete = accountMappings.some((m) => {
       if (!m.plId) return false;

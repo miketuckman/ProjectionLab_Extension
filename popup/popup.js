@@ -126,22 +126,10 @@
   }
 
   function renderOnMonarch(plCount, monarchTotal) {
-    setStatus('green', 'Ready to sync');
+    setStatus('green', 'Ready for MCP balance sync');
     contentEl.innerHTML = `
-      <div class="sync-wrap sync-wrap-top">
-        <button type="button" class="btn btn-primary btn-sync-now" id="sync-btn">Sync Now</button>
-      </div>
-    `;
-    contentEl.querySelector('#sync-btn').onclick = () => runSync();
-  }
-
-  function renderSyncing() {
-    statusText.textContent = 'Syncing…';
-    contentEl.innerHTML = `
-      <div class="sync-wrap sync-wrap-top">
-        <button type="button" class="btn btn-primary btn-sync-now" id="sync-btn" disabled>
-          <span class="spinner"></span> Syncing…
-        </button>
+      <div class="cta-card">
+        <p>Use the ProjectionLab MCP tools to create a rollback snapshot and review a balance-sync preview before approving any writes.</p>
       </div>
     `;
   }
@@ -307,14 +295,13 @@
       : '';
 
     contentEl.innerHTML = `
-      <div class="sync-wrap sync-wrap-top">
-        <button type="button" class="btn btn-primary btn-sync-now" id="sync-btn">Sync Now</button>
+      <div class="cta-card">
+        <p>New balance syncs run through the ProjectionLab MCP snapshot, preview, and approval workflow.</p>
       </div>
       ${lastSyncSection}
       ${ratingBanner}
       ${syncHistorySection}
     `;
-    contentEl.querySelector('#sync-btn').onclick = () => runSync();
 
     const dismissRating = document.getElementById('dismiss-webstore-rating-prompt');
     if (dismissRating) {
@@ -372,70 +359,19 @@
     return div.innerHTML;
   }
 
-  let currentTabId = null;
-
-  async function runSync() {
-    if (!currentTabId) return;
-    renderSyncing();
-    try {
-      const res = await chrome.runtime.sendMessage({ type: 'RUN_SYNC', tabId: currentTabId });
-      const [local, syncPref] = await Promise.all([
-        chrome.storage.local.get([
-          'lastSyncTime',
-          'lastSyncResults',
-          'lastSyncDebug',
-          'syncHistory',
-          'webstoreRatingPromptDismissed',
-        ]),
-        chrome.storage.sync.get(['showDebugOnPopup']),
-      ]);
-      if (res.results && res.results.length) {
-        renderResults(
-          res.results,
-          local.lastSyncTime || Date.now(),
-          res.error,
-          local.lastSyncDebug,
-          !!syncPref.showDebugOnPopup,
-          local.syncHistory || [],
-          true,
-          !!local.webstoreRatingPromptDismissed
-        );
-      } else {
-        setStatus('gray', res.error || 'Sync failed');
-        contentEl.innerHTML = `
-          <div class="cta-card">
-            <p>${escapeHtml(res.error || 'Unknown error')}</p>
-            <button type="button" class="btn btn-primary" id="sync-retry">Sync Now</button>
-          </div>
-        `;
-        document.getElementById('sync-retry').onclick = () => runSync();
-      }
-    } catch (e) {
-      setStatus('gray', 'Sync failed');
-      contentEl.innerHTML = `
-        <div class="cta-card">
-          <p>${escapeHtml(e.message || String(e))}</p>
-          <button type="button" class="btn btn-primary" id="sync-retry">Sync Now</button>
-        </div>
-      `;
-      document.getElementById('sync-retry').onclick = () => runSync();
-    }
-  }
-
   async function init() {
     document.getElementById('open-setup').onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL('setup/setup.html') });
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const tabUrl = tab?.url || '';
     const onMonarch = tabUrl.startsWith(MONARCH_ORIGIN);
-    currentTabId = tab?.id ?? null;
 
     let sync;
     let local;
     let rawMappings;
     try {
       [sync, local, rawMappings] = await Promise.all([
-        chrome.storage.sync.get(['plApiKey', 'showDebugOnPopup']),
+        chrome.storage.sync.get(['showDebugOnPopup']),
         chrome.storage.local.get([
           'lastSyncTime',
           'lastSyncResults',
@@ -445,12 +381,13 @@
         ]),
         getMappingStorage().loadMappings(),
       ]);
+      local.plApiKey = await globalThis.ProjectionLabSecretStorage.loadApiKey();
     } catch (e) {
       console.error('[Chrysalis][popup] Failed to load account mappings:', e);
       renderMappingStorageError(e);
       return;
     }
-    const plApiKey = sync.plApiKey;
+    const plApiKey = local.plApiKey;
     const mappings = normalizeMappings(rawMappings || []);
     const isConfigured = !!(plApiKey && plApiKey.trim() && mappings.length > 0);
     const plMappingCount = mappings.length;

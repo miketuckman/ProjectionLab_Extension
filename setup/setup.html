@@ -909,14 +909,14 @@
       <div class="chip" id="chip-maps"> <span class="dot"></span> <span id="chip-maps-text">Account Mappings — 0 mapped</span> </div>
       <div class="chip ok chip-ready" id="chip-ready" style="display:none">
         <span class="dot"></span>
-        <span>Ready to Sync</span>
+        <span>Ready for MCP</span>
         <button type="button" class="chip-how-btn" id="chip-how-btn" aria-haspopup="dialog" aria-expanded="false">How?</button>
         <div class="chip-how-pop" id="chip-how-pop" role="dialog" aria-label="How to run a sync" hidden>
-          <strong>To run a sync:</strong>
+          <strong>To run a balance sync:</strong>
           <ol>
-            <li>Open <a href="https://app.monarch.com" target="_blank" rel="noopener noreferrer">app.monarch.com</a> in a browser tab.</li>
-            <li>Click the Chrysalis extension icon.</li>
-            <li>Click <strong>Sync Now</strong>.</li>
+            <li>Open signed-in <a href="https://app.monarch.com" target="_blank" rel="noopener noreferrer">Monarch</a> and ProjectionLab tabs.</li>
+            <li>Use <strong>pl_preview_balance_sync</strong> from the retirement-planning task.</li>
+            <li>Review the snapshot-backed preview, then explicitly approve <strong>pl_apply_balance_sync</strong>.</li>
           </ol>
         </div>
       </div>
@@ -1044,11 +1044,11 @@
 
         <div class="advanced-block">
           <label class="advanced-label">
-            <input type="checkbox" id="auto-sync-enabled" />
-            Run sync automatically
+            <input type="checkbox" id="auto-sync-enabled" disabled />
+            Automatic sync disabled in MCP fork
           </label>
-          <p class="advanced-note" style="margin-bottom:10px">Sync runs in the background at the time you choose. Requires a Monarch tab to be open (any window); if none is open, that run is skipped.</p>
-          <div class="auto-sync-options" id="auto-sync-options">
+          <p class="advanced-note" style="margin-bottom:10px">Scheduled writes are intentionally unavailable. Each run requires a fresh snapshot, reviewed preview, and explicit MCP approval.</p>
+          <div class="auto-sync-options" id="auto-sync-options" style="display:none">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
               <label for="auto-sync-frequency" class="advanced-label" style="margin:0">Frequency</label>
               <select id="auto-sync-frequency" class="advanced-select">
@@ -1173,6 +1173,7 @@
     </div>
   </div>
   <script src="../shared/mapping-storage.js"></script>
+  <script src="../shared/secret-storage.js"></script>
   <script src="setup.js"></script>
 </body>
 </html>

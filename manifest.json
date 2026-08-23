@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Chrysalis",
+  "name": "ProjectionLab MCP Bridge (Chrysalis)",
   "version": "1.1.0",
-  "description": "Sync Monarch Money balances to ProjectionLab with one click.",
-  "permissions": ["storage", "activeTab", "scripting", "tabs", "alarms"],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAj9sFpxZWWrZmjypTTeonbyZ2HuWLMb+U8/kS4zX06JZszfyyKjgI9FdsKWRy+kNvBcWq3kVBmS+5EDNXrFQv45MlXsvSnwzWZXpA5dHRoqQkXp2hgpRikBY1f/VZHnbIbqMrNGpFreQB2Ny/BCsuKEDBjzG7/DIUoUTIn8QlxyM1Nq/vcv6WBM6gnOn0qUN6dsccyeGUfORBSz7kq594aPPPWmr7wOjBh3uZtkLwdJoxEd/SK6O50Mq8e/moDd+g2rsB7kXaVEZDee6CiB0z9Mu3YpO3Jg2A35+03T6rmAMoEPU7eYEFQiDXSLRQSgk1SKjifAXtq40XSmxcdUstAQIDAQAB",
+  "description": "Preview and approve snapshot-backed Monarch balance updates to ProjectionLab through a local MCP server.",
+  "permissions": ["storage", "scripting", "tabs", "nativeMessaging"],
   "host_permissions": [
     "https://app.monarch.com/*",
     "https://api.monarch.com/*",

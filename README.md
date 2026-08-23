@@ -4,7 +4,7 @@
 
 <h1>Chrysalis</h1>
 
-<strong>Sync Monarch Money balances into ProjectionLab — in one click.</strong>
+<strong>Snapshot, preview, and approve Monarch balance updates to ProjectionLab through MCP.</strong>
 
 <p>🟧 <strong>Monarch</strong> <em>(source)</em> &nbsp;→&nbsp; 🟦 <strong>ProjectionLab</strong> <em>(destination)</em></p>
 
@@ -16,7 +16,15 @@
 
 </div>
 
-Chrysalis is a Chrome extension that pulls your live account balances from Monarch Money and pushes them into ProjectionLab with one click. No scripts, no terminal, no copy-pasting numbers by hand.
+> **Mike's local MCP fork:** This repository extends Chrysalis with a
+> snapshot-backed local MCP server. Direct and scheduled writes are disabled;
+> use the MCP preview/approval/apply workflow documented in
+> [`docs/MCP.md`](docs/MCP.md). The upstream README below describes the original
+> public extension and may not match this fork's safety controls.
+
+This fork uses the Chrysalis browser integration to read live Monarch balances and
+apply explicitly approved ProjectionLab updates through a local MCP server. Every
+write is preceded by a complete rollback snapshot and field-level preview.
 
 Chrysalis is, and will always be, **free** to use. But if you want to say thank you, [coffee is my love language](https://ko-fi.com/tylerclass).
 
@@ -149,15 +157,18 @@ When you select a ProjectionLab account that is one of these asset types, the ro
 
 ### Sync Accounts
 
-Once setup is complete, syncing is a one-step process:
+Once setup and the local MCP bridge are complete, syncing is an approval workflow:
 
-1. Navigate to `app.monarchmoney.com` in Chrome (and make sure you're logged in)
-2. Click the Chrysalis icon in your toolbar
-3. Click **Sync Now**
+1. Keep signed-in Monarch and ProjectionLab tabs open in Chrome.
+2. Call `pl_preview_balance_sync` from the retirement-planning task.
+3. Review the rollback snapshot ID and every proposed field-level change.
+4. Explicitly approve `pl_apply_balance_sync` with the required confirmation phrase.
 
 <kbd><img src="screenshots/popup-ready-to-sync-first-time.png" width="400"></kbd>
 
-The sync button is only active when you're on the Monarch site. This is intentional — Chrysalis reads your session directly from the Monarch page, so the page needs to be open. If you're on a different tab and click the popup, it instructs you to go to a Monarch tab first before you can sync, as seen here:
+The popup reports readiness but exposes no direct write button. This is
+intentional: the MCP process controls snapshot creation, preview expiry,
+confirmation, stale-state checks, and receipt storage.
 
 <kbd><img src="screenshots/popup-wrong-tab.png" width="400"></kbd>
 

@@ -14,3 +14,5 @@ coverage/
 *.swp
 .env
 .env.*
+.local-data/
+*.projectionlab-export.json

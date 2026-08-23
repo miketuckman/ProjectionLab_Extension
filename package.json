@@ -1,0 +1,21 @@
+{
+  "name": "projectionlab-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local MCP and Chrome extension bridge for snapshot-backed Monarch to ProjectionLab balance synchronization.",
+  "scripts": {
+    "check": "node scripts/check-project.js",
+    "test": "node --test tests/*.test.js",
+    "mcp": "node mcp-server/index.js",
+    "install:native-host": "node scripts/install-native-host.js",
+    "uninstall:native-host": "node scripts/uninstall-native-host.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "zod": "3.25.76"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
