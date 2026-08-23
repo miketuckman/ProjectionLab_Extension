@@ -981,16 +981,29 @@
 
       status.textContent = 'Fetching Monarch accounts… (can take 30–60 sec)';
 
-      await chrome.scripting.executeScript({
-        target: { tabId: monarchTab.id },
-        files: ['content-scripts/monarch.js'],
-      });
-
-      const monarchPromise = chrome.tabs.sendMessage(monarchTab.id, { type: 'FETCH_ACCOUNTS' });
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('timeout')), LOAD_ACCOUNTS_TIMEOUT_MS);
-      });
-      const monarchRes = await Promise.race([monarchPromise, timeoutPromise]);
+      const fetchAccounts = () => {
+        const monarchPromise = chrome.tabs.sendMessage(monarchTab.id, {
+          type: 'FETCH_ACCOUNTS',
+        });
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('timeout')), LOAD_ACCOUNTS_TIMEOUT_MS);
+        });
+        return Promise.race([monarchPromise, timeoutPromise]);
+      };
+      let monarchRes;
+      try {
+        monarchRes = await fetchAccounts();
+      } catch (error) {
+        const noReceiver = /receiving end does not exist|could not establish connection/i.test(
+          error.message || String(error),
+        );
+        if (!noReceiver) throw error;
+        await chrome.scripting.executeScript({
+          target: { tabId: monarchTab.id },
+          files: ['content-scripts/monarch.js'],
+        });
+        monarchRes = await fetchAccounts();
+      }
 
       if (monarchRes && monarchRes.success) {
         monarchAccounts = monarchRes.accounts || [];

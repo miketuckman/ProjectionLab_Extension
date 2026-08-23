@@ -48,13 +48,28 @@ function buildMonarchHeaders(csrftoken) {
 
 async function getMonarchCSRFToken() {
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: "GET_MONARCH_CSRF_TOKEN", url: MONARCH_ORIGIN }, (response) => {
-      if (!response || !response.success) {
-        resolve(null);
-        return;
-      }
-      resolve(response.token);
-    });
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), 5_000);
+    try {
+      chrome.runtime.sendMessage(
+        { type: 'GET_MONARCH_CSRF_TOKEN', url: MONARCH_ORIGIN },
+        (response) => {
+          if (chrome.runtime.lastError || !response?.success) {
+            finish(null);
+            return;
+          }
+          finish(response.token || null);
+        },
+      );
+    } catch {
+      finish(null);
+    }
   });
 }
 

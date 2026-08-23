@@ -180,14 +180,31 @@ async function fetchMonarchBalancesForMappings(mappings) {
       ]),
     ),
   ];
-  await chrome.scripting.executeScript({
-    target: { tabId: monarchTab.id },
-    files: ['content-scripts/monarch.js'],
-  });
-  const response = await chrome.tabs.sendMessage(monarchTab.id, {
-    type: 'FETCH_BALANCES',
-    accountIds,
-  });
+  const message = { type: 'FETCH_BALANCES', accountIds };
+  const sendWithTimeout = () =>
+    Promise.race([
+      chrome.tabs.sendMessage(monarchTab.id, message),
+      new Promise((_, reject) => {
+        setTimeout(
+          () => reject(new Error('Monarch balance retrieval timed out after 45 seconds.')),
+          45_000,
+        );
+      }),
+    ]);
+  let response;
+  try {
+    response = await sendWithTimeout();
+  } catch (error) {
+    const noReceiver = /receiving end does not exist|could not establish connection/i.test(
+      error.message || String(error),
+    );
+    if (!noReceiver) throw error;
+    await chrome.scripting.executeScript({
+      target: { tabId: monarchTab.id },
+      files: ['content-scripts/monarch.js'],
+    });
+    response = await sendWithTimeout();
+  }
   if (!response?.success) {
     throw new Error(response?.error || 'Monarch balance retrieval failed.');
   }
@@ -429,6 +446,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       return false;
   } else if (message.type == 'GET_MONARCH_CSRF_TOKEN') {
+    if (!sender.tab?.id) {
+      sendResponse({ success: false, token: null });
+      return false;
+    }
     chrome.scripting.executeScript({
       target: { tabId: sender.tab.id },
       world: 'MAIN',
@@ -436,10 +457,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const match = document.cookie.match(/(^|;\s*)csrftoken=([^;]*)/);
         return match ? match[2] : null;
       }
-    }).then(results => {
-      const tokenVal = results[0].result;
-      sendResponse({ success: true, token: tokenVal});
-    });
+    })
+      .then((results) => {
+        const tokenVal = results?.[0]?.result || null;
+        sendResponse({ success: true, token: tokenVal });
+      })
+      .catch(() => sendResponse({ success: false, token: null }));
     return true; // Keep channel open for async response
   }
   return false;
